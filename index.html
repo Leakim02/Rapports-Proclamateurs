@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Gestion des proclamateurs</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-style@0.8.13/dist/xlsx.full.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
@@ -41,13 +42,13 @@
           oninput="majNomGroupe()">
       </div>
 
-      <div class="flex gap-3 mb-4">
+      <div class="flex flex-col md:flex-row gap-3 mb-4">
         <input type="text" id="newNom" placeholder="Nom"
           class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
         <input type="text" id="newPrenom" placeholder="Prénom"
           class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
         <button onclick="ajouterProclamateur()"
-          class="bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition">
+          class="bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition w-full md:w-auto">
           Ajouter
         </button>
       </div>
@@ -55,17 +56,18 @@
       <!-- Liste des membres -->
       <div>
         <h3 class="text-lg font-semibold mb-2">Membres du groupe :</h3>
-        <ul id="listeMembres" class="list-disc list-inside bg-gray-50 p-4 rounded-xl border min-h-[50px]">
+        <ul id="listeMembres" class="list-disc list-inside bg-gray-50 p-4 rounded-xl border min-h-[50px] overflow-auto max-h-96">
           <li class="text-gray-400 italic">Aucun proclamateur ajouté</li>
         </ul>
       </div>
     </section>
 
+
     <!-- Page Activité de service (par défaut) -->
     <section id="activite" class="page">
       <h2 class="text-2xl font-bold mb-4">Activité de service</h2>
 
-      <div class="flex gap-3 mb-6 flex-wrap">
+      <div class="flex flex-col md:flex-row gap-3 mb-6 flex-wrap">
         <select id="listeProclamateurs"
           class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </select>
@@ -79,34 +81,33 @@
           <option value="Pionnier permanent">Pionnier permanent</option>
         </select>
 
-
         <input type="number" id="heures" placeholder="Heures"
-          class="w-36 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          class="w-full md:w-36 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
 
         <input type="number" id="coursBib" placeholder="Cours bibliques"
-          class="w-36 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          class="w-full md:w-36 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
 
         <button onclick="ajouterLigne()"
-          class="bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600 transition">
+          class="bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600 transition w-full md:w-auto">
           ➕
         </button>
       </div>
 
-      <!-- Bouton de réinitialisation -->
-      <div class="mb-4">
+      <!-- Boutons -->
+      <div class="mb-4 flex flex-col md:flex-row gap-3">
         <button onclick="resetTableau()"
-          class="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600 transition">
+          class="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600 transition w-full md:w-auto">
           Réinitialiser le tableau
         </button>
-        <button onclick="exportEtNouvelEmail()"
-          class="bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition">
-          Partager
+        <button onclick="exportExcelOnly()"
+          class="bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition w-full md:w-auto">
+          Exporter
         </button>
-
       </div>
 
+      <!-- Tableau responsive -->
       <div class="overflow-x-auto">
-        <table class="w-full text-center border-collapse">
+        <table class="min-w-full text-center border-collapse">
           <thead class="bg-gray-200">
             <tr>
               <th class="px-4 py-2">Proclamateur</th>
@@ -119,36 +120,68 @@
         </table>
       </div>
     </section>
+
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+
+  
   <script>
-  function exportEtNouvelEmail() {
+  async function exportExcelOnly() {
     if (activites.length === 0) {
       return alert("⚠️ Le tableau est vide.");
     }
 
-    // Générer le fichier Excel
-    const ws_data = [["Proclamateur", "Participation", "Heures", "Cours bibliques"]];
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Activité");
+
+    // Ajouter les entêtes
+    worksheet.addRow(["Proclamateur", "Participation", "Heures", "Cours bibliques"]);
+
+    // Ajouter les données triées
     const activitesTriees = [...activites].sort((a, b) => a.nom.localeCompare(b.nom));
     activitesTriees.forEach(a => {
-      ws_data.push([a.nom, a.participation, a.heures, a.coursBib]);
+      worksheet.addRow([a.nom, a.participation, a.heures, a.coursBib]);
     });
 
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Activité");
+    // Style des colonnes
+    worksheet.columns.forEach(col => {
+      col.alignment = { vertical: "middle", horizontal: "center" };
+      col.width = 25; // largeur auto lisible
+    });
 
-    // Télécharger le fichier localement
-    XLSX.writeFile(wb, "activite_service.xlsx");
+    // Style des entêtes
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).eachCell(cell => {
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" }
+      };
+    });
 
-    // Ouvrir Gmail avec un nouveau mail (l'utilisateur devra joindre le fichier manuellement)
-    const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&su=" 
-        + encodeURIComponent("Rapport d'activité de service") 
-        + "&body=" + encodeURIComponent("Bonjour,\n\nVeuillez trouver ci-joint le fichier Excel avec le rapport d'activité.\n\nFraternellement,");
-    
-    window.open(gmailUrl, "_blank");
+    // Bordures pour toutes les cellules
+    worksheet.eachRow(row => {
+      row.eachCell(cell => {
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" }
+        };
+      });
+    });
+
+    // Générer le fichier Excel
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "activite_service.xlsx";
+    link.click();
   }
+
   </script>
 
 
