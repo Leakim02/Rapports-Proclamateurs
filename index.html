@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestion des proclamateurs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Header avec menu burger -->
+  <header class="bg-white shadow-md p-4 flex items-center">
+    <button id="burgerBtn" class="text-gray-700 text-2xl mr-4">☰</button>
+    <h1 class="text-xl font-bold text-gray-800">Rapports Proclamateurs</h1>
+  </header>
+
+  <!-- Volet menu -->
+  <div id="drawer" class="fixed top-0 left-0 w-64 h-full bg-white shadow-lg transform -translate-x-full transition-transform z-50">
+    <div class="p-4 border-b">
+      <button id="nomGroupeAffiche" onclick="showPage('gestion')" class="text-lg font-bold text-blue-600 hover:underline">
+        Menu
+      </button>
+    </div>
+    <nav class="flex flex-col mt-4">
+      <button onclick="showPage('activite')" class="text-left px-4 py-2 hover:bg-gray-100">Activité de service</button>
+    </nav>
+  </div>
+
+  <!-- Overlay -->
+  <div id="overlay" class="fixed inset-0 bg-black bg-opacity-30 hidden z-40"></div>
+
+  <!-- Contenu principal -->
+  <main class="p-6">
+    <!-- Page Gestion du groupe -->
+    <section id="gestion" class="page hidden">
+      <h2 class="text-2xl font-bold mb-4">Gestion du groupe</h2>
+
+      <div class="mb-4">
+        <label class="block mb-2 font-semibold">Nom du groupe :</label>
+        <input type="text" id="nomGroupe" placeholder="Entrez le nom du groupe"
+          class="w-full border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          oninput="majNomGroupe()">
+      </div>
+
+      <div class="flex gap-3 mb-4">
+        <input type="text" id="newNom" placeholder="Nom"
+          class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input type="text" id="newPrenom" placeholder="Prénom"
+          class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button onclick="ajouterProclamateur()"
+          class="bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition">
+          Ajouter
+        </button>
+      </div>
+
+      <!-- Liste des membres -->
+      <div>
+        <h3 class="text-lg font-semibold mb-2">Membres du groupe :</h3>
+        <ul id="listeMembres" class="list-disc list-inside bg-gray-50 p-4 rounded-xl border min-h-[50px]">
+          <li class="text-gray-400 italic">Aucun proclamateur ajouté</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Page Activité de service (par défaut) -->
+    <section id="activite" class="page">
+      <h2 class="text-2xl font-bold mb-4">Activité de service</h2>
+
+      <div class="flex gap-3 mb-6 flex-wrap">
+        <select id="listeProclamateurs"
+          class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </select>
+
+        <select id="participation"
+          class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="A participé">A participé</option>
+          <option value="N'a pas participé">N'a pas participé</option>
+          <option value="Pionnier auxiliaire (15h)">Pionnier auxiliaire (15h)</option>
+          <option value="Pionnier auxiliaire (30h)">Pionnier auxiliaire (30h)</option>
+          <option value="Pionnier permanent">Pionnier permanent</option>
+        </select>
+
+
+        <input type="number" id="heures" placeholder="Heures"
+          class="w-36 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+        <input type="number" id="coursBib" placeholder="Cours bibliques"
+          class="w-36 border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+        <button onclick="ajouterLigne()"
+          class="bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600 transition">
+          ➕
+        </button>
+      </div>
+
+      <!-- Bouton de réinitialisation -->
+      <div class="mb-4">
+        <button onclick="resetTableau()"
+          class="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600 transition">
+          Réinitialiser le tableau
+        </button>
+        <button onclick="exportEtNouvelEmail()"
+          class="bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition">
+          Partager
+        </button>
+
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-center border-collapse">
+          <thead class="bg-gray-200">
+            <tr>
+              <th class="px-4 py-2">Proclamateur</th>
+              <th class="px-4 py-2">Participation</th>
+              <th class="px-4 py-2">Heures</th>
+              <th class="px-4 py-2">Cours bibliques</th>
+            </tr>
+          </thead>
+          <tbody id="tableauResultats" class="divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script>
+  function exportEtNouvelEmail() {
+    if (activites.length === 0) {
+      return alert("⚠️ Le tableau est vide.");
+    }
+
+    // Générer le fichier Excel
+    const ws_data = [["Proclamateur", "Participation", "Heures", "Cours bibliques"]];
+    const activitesTriees = [...activites].sort((a, b) => a.nom.localeCompare(b.nom));
+    activitesTriees.forEach(a => {
+      ws_data.push([a.nom, a.participation, a.heures, a.coursBib]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Activité");
+
+    // Télécharger le fichier localement
+    XLSX.writeFile(wb, "activite_service.xlsx");
+
+    // Ouvrir Gmail avec un nouveau mail (l'utilisateur devra joindre le fichier manuellement)
+    const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&su=" 
+        + encodeURIComponent("Rapport d'activité de service") 
+        + "&body=" + encodeURIComponent("Bonjour,\n\nVeuillez trouver ci-joint le fichier Excel avec le rapport d'activité.\n\nFraternellement,");
+    
+    window.open(gmailUrl, "_blank");
+  }
+  </script>
+
+
+  <script>
+    const burgerBtn = document.getElementById("burgerBtn");
+    const drawer = document.getElementById("drawer");
+    const overlay = document.getElementById("overlay");
+    const pages = document.querySelectorAll(".page");
+    const nomGroupeInput = document.getElementById("nomGroupe");
+    const nomGroupeAffiche = document.getElementById("nomGroupeAffiche");
+    const listeMembres = document.getElementById("listeMembres");
+    const listeSelect = document.getElementById("listeProclamateurs");
+    const tableau = document.getElementById("tableauResultats");
+
+    // ===================== DONNÉES LOCALES =====================
+    let proclamateurs = JSON.parse(localStorage.getItem("proclamateurs")) || [];
+    let activites = JSON.parse(localStorage.getItem("activites")) || [];
+    let nomGroupe = localStorage.getItem("nomGroupe") || "";
+
+    // ===================== MENU BURGER =====================
+    burgerBtn.addEventListener("click", () => {
+      drawer.classList.remove("-translate-x-full");
+      overlay.classList.remove("hidden");
+    });
+    overlay.addEventListener("click", () => {
+      drawer.classList.add("-translate-x-full");
+      overlay.classList.add("hidden");
+    });
+
+    function showPage(pageId) {
+      pages.forEach(p => p.classList.add("hidden"));
+      document.getElementById(pageId).classList.remove("hidden");
+      drawer.classList.add("-translate-x-full");
+      overlay.classList.add("hidden");
+    }
+
+    // ===================== UTILITAIRES =====================
+    function formatNomPrenom(nom, prenom) {
+      const formattedNom = nom.toUpperCase();
+      const formattedPrenom = prenom.charAt(0).toUpperCase() + prenom.slice(1).toLowerCase();
+      return `${formattedNom} ${formattedPrenom}`;
+    }
+
+    // ===================== NOM DU GROUPE =====================
+    function majNomGroupe() {
+      nomGroupe = nomGroupeInput.value.trim();
+      nomGroupeAffiche.textContent = nomGroupe || "Menu";
+      localStorage.setItem("nomGroupe", nomGroupe);
+    }
+
+    // ===================== PROCLAMATEURS =====================
+    function ajouterProclamateur() {
+      const nom = document.getElementById("newNom").value.trim();
+      const prenom = document.getElementById("newPrenom").value.trim();
+
+      if (!nom || !prenom) {
+        return alert("⚠️ Veuillez entrer un nom et un prénom.");
+      }
+
+      const formatted = formatNomPrenom(nom, prenom);
+
+      if (!proclamateurs.includes(formatted)) {
+        proclamateurs.push(formatted);
+        proclamateurs.sort();
+        localStorage.setItem("proclamateurs", JSON.stringify(proclamateurs));
+        majListeMembres();
+        majListeSelect();
+        document.getElementById("newNom").value = "";
+        document.getElementById("newPrenom").value = "";
+      } else {
+        alert("⚠️ Ce proclamateur existe déjà.");
+      }
+    }
+
+    function supprimerProclamateur(nomComplet) {
+      if (confirm(`Supprimer ${nomComplet} ?`)) {
+        proclamateurs = proclamateurs.filter(p => p !== nomComplet);
+        localStorage.setItem("proclamateurs", JSON.stringify(proclamateurs));
+        majListeMembres();
+        majListeSelect();
+      }
+    }
+
+    function majListeMembres() {
+      listeMembres.innerHTML = "";
+      if (proclamateurs.length === 0) {
+        listeMembres.innerHTML = '<li class="text-gray-400 italic">Aucun proclamateur ajouté</li>';
+      } else {
+        proclamateurs.forEach(nomComplet => {
+          const li = document.createElement("li");
+          li.className = "flex justify-between items-center";
+          li.innerHTML = `
+            <span>${nomComplet}</span>
+            <button onclick="supprimerProclamateur('${nomComplet}')"
+              class="text-pink-500 hover:text-pink-700">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m2-2h6a2 2 0 012 2v0H7a2 2 0 012-2z" />
+              </svg>
+            </button>
+          `;
+          listeMembres.appendChild(li);
+        });
+      }
+    }
+
+    function majListeSelect() {
+      listeSelect.innerHTML = "";
+      proclamateurs.forEach(nomComplet => {
+        const option = document.createElement("option");
+        option.value = nomComplet;
+        option.textContent = nomComplet;
+        listeSelect.appendChild(option);
+      });
+    }
+
+    // ===================== ACTIVITÉS =====================
+    function ajouterLigne() {
+      const nom = listeSelect.value;
+      const participation = document.getElementById("participation").value;
+      const heures = document.getElementById("heures").value;
+      const coursBib = document.getElementById("coursBib").value;
+
+      if (!nom) return alert("⚠️ Sélectionne un proclamateur.");
+
+      const index = activites.findIndex(a => a.nom === nom);
+
+      if (index !== -1) {
+        activites[index] = {
+          nom,
+          participation,
+          heures: heures || "-",
+          coursBib: coursBib || "-"
+        };
+      } else {
+        activites.push({
+          nom,
+          participation,
+          heures: heures || "-",
+          coursBib: coursBib || "-"
+        });
+      }
+
+      localStorage.setItem("activites", JSON.stringify(activites));
+      majTableau();
+
+      document.getElementById("heures").value = "";
+      document.getElementById("coursBib").value = "";
+    }
+
+    function majTableau() {
+      tableau.innerHTML = "";
+
+      // Trier les activités par nom alphabétique
+      const activitesTriees = [...activites].sort((a, b) => a.nom.localeCompare(b.nom));
+
+      activitesTriees.forEach(act => {
+        const ligne = document.createElement("tr");
+        ligne.classList.add("hover:bg-gray-50");
+        ligne.innerHTML = `
+          <td class="px-4 py-2">${act.nom}</td>
+          <td class="px-4 py-2">${act.participation}</td>
+          <td class="px-4 py-2">${act.heures}</td>
+          <td class="px-4 py-2">${act.coursBib}</td>
+        `;
+        tableau.appendChild(ligne);
+      });
+    }
+
+
+    // ===================== RESET TABLEAU =====================
+    function resetTableau() {
+      if (confirm("⚠️ Voulez-vous vraiment réinitialiser le tableau ?")) {
+        activites = [];
+        localStorage.setItem("activites", JSON.stringify(activites));
+        majTableau();
+      }
+    }
+
+    // ===================== INITIALISATION =====================
+    window.onload = () => {
+      nomGroupeInput.value = nomGroupe;
+      nomGroupeAffiche.textContent = nomGroupe || "Menu";
+      majListeMembres();
+      majListeSelect();
+      majTableau();
+    };
+  </script>
+
+</body>
+</html>
